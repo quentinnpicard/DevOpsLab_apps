@@ -1,0 +1,39 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mydemoapp
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mydemoapp
+  template:
+    metadata:
+      labels:
+        app: mydemoapp
+    spec:
+      containers:
+      - name: mydemoapp
+        image: manojnair/myapp:v4
+        ports:
+        - containerPort: 80
+        # resources:
+        # limits:
+        #   cpu: "500m"
+          # memory: "512Mi"
+        # requests:
+        #   cpu: "250m"
+        #   memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mydemoapp-service
+spec:
+  type: LoadBalancer
+  selector:
+    app: mydemoapp
+  ports:
+    - port: 80
+      targetPort: 80
