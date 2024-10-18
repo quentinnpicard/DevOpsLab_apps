@@ -5,6 +5,10 @@ variable "location" {
   type = string
   description = "location where are deploy the Ressource Group"
 }
+variable "environment" {
+  type = string
+  description = "location where are deploy the Ressource Group"
+}
 variable "address_prefixes" {
   description = "The address space that is used the virtual network. You can supply more than one address space."
   type = list(string)

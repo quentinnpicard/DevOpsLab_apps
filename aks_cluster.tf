@@ -12,7 +12,7 @@ resource "azurerm_resource_group" "RG" {
 module "deploy_network" {
   source = "./network"
   resource_group_name = azurerm_resource_group.RG.name
-  name_vnet = "${random_pet.prefix.id}-vnet"
+  name_vnet = "${var.environment}-vnet"
   name_subnet = "${random_pet.prefix.id}-sn"
   address_prefixes = var.address_prefixes
 }
@@ -20,7 +20,7 @@ module "deploy_network" {
 module "deploy_aks" {
   source = "./compute"
   resource_group_name = azurerm_resource_group.RG.name
-  name_cluster = "${random_pet.prefix.id}-cluster"
+  name_cluster = "${var.environment}-cluster"
   name_node_pool = "system"
   node_number = 1
   subnet_id = module.deploy_network.subnet_id

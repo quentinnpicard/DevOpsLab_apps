@@ -45,7 +45,7 @@ stages:
   extends: .init
   script: 
     - terraform validate
-    - terraform plan -input=false -var-file="variables.tfvars" --out plan-${ENV}
+    - terraform plan -input=false -var-file="${ENV}.tfvars" --out plan-${ENV}
   artifacts:
     paths:
       - plan-${ENV}
@@ -73,8 +73,8 @@ stages:
   extends: .init
   stage: destroy
   script:
-    - terraform refresh -input=false -var-file="variables.tfvars"
-    - terraform destroy -auto-approve -var-file="variables.tfvars"
+    - terraform refresh -input=false -var-file="${ENV}.tfvars"
+    - terraform destroy -auto-approve -var-file="${ENV}.tfvars"
 
   rules:
     - if: '$CI_COMMIT_BRANCH == "master"'
