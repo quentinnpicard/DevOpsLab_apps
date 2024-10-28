@@ -1,0 +1,177 @@
+name: CI DevOpsLab_apps
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+
+jobs:
+  plan_staging:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.9.8
+      - name: Initialize Terraform
+        run: |
+          echo "resource_group_name  = \"${{ secrets.TF_AZURE_RG }}\"" > backend.hcl
+          echo "storage_account_name = \"${{ secrets.TF_AZURE_STORAGE_ACCOUNT }}\"" >> backend.hcl
+          echo "container_name       = \"${{ secrets.TF_AZURE_CONTAINER }}\"" >> backend.hcl
+          echo "key                  = \"${{ secrets.TF_STATE_NAME }}-staging\"" >> backend.hcl
+          terraform init -backend-config=backend.hcl -reconfigure
+      - name: Validate Terraform
+        run: terraform validate
+      - name: Plan Terraform
+        run: terraform plan -input=false -var-file="env/staging.tfvars" --out plan-staging
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: plan-staging
+          path: plan-staging
+
+  plan_tech:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.9.8
+      - name: Initialize Terraform
+        run: |
+          echo "resource_group_name  = \"${{ secrets.TF_AZURE_RG }}\"" > backend.hcl
+          echo "storage_account_name = \"${{ secrets.TF_AZURE_STORAGE_ACCOUNT }}\"" >> backend.hcl
+          echo "container_name       = \"${{ secrets.TF_AZURE_CONTAINER }}\"" >> backend.hcl
+          echo "key                  = \"${{ secrets.TF_STATE_NAME }}-tech\"" >> backend.hcl
+          terraform init -backend-config=backend.hcl -reconfigure
+      - name: Validate Terraform
+        run: terraform validate
+      - name: Plan Terraform
+        run: terraform plan -input=false -var-file="env/tech.tfvars" --out plan-tech
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: plan-tech
+          path: plan-tech
+
+  apply_staging:
+    runs-on: ubuntu-latest
+    needs: plan_staging
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Download plan artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: plan-staging
+          path: .
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.9.8
+      - name: Apply Terraform
+        run: terraform apply -auto-approve plan-staging
+      - name: Save kubeconfig
+        run: terraform output kubeconfig > ${{ github.workspace }}/kubeconfig
+      - name: Upload kubeconfig artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: kubeconfig-staging
+          path: ${{ github.workspace }}/kubeconfig
+
+  apply_tech:
+    runs-on: ubuntu-latest
+    needs: plan_tech
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Download plan artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: plan-tech
+          path: .
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.9.8
+      - name: Apply Terraform
+        run: terraform apply -auto-approve plan-tech
+      - name: Save kubeconfig
+        run: terraform output kubeconfig > ${{ github.workspace }}/kubeconfig
+      - name: Upload kubeconfig artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: kubeconfig-tech
+          path: ${{ github.workspace }}/kubeconfig
+
+  deploy_helm:
+    runs-on: ubuntu-latest
+    needs: [apply_staging, apply_tech]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Set up Helm
+        uses: azure/setup-helm@v1
+      - name: Download kubeconfig artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: kubeconfig-staging
+          path: ${{ github.workspace }}/kubeconfig-staging
+      - name: Download kubeconfig artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: kubeconfig-tech
+          path: ${{ github.workspace }}/kubeconfig-tech
+      - name: Deploy with Helm
+        run: |
+          helm version
+          kubectl version --client
+          # helm repo add bitnami https://charts.bitnami.com/bitnami
+          # helm upgrade --install my-app bitnami/nginx --namespace ${{ github.event.inputs.environment }} --create-namespace
+
+  destroy_staging:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.9.8
+      - name: Initialize Terraform
+        run: |
+          echo "resource_group_name  = \"${{ secrets.TF_AZURE_RG }}\"" > backend.hcl
+          echo "storage_account_name = \"${{ secrets.TF_AZURE_STORAGE_ACCOUNT }}\"" >> backend.hcl
+          echo "container_name       = \"${{ secrets.TF_AZURE_CONTAINER }}\"" >> backend.hcl
+          echo "key                  = \"${{ secrets.TF_STATE_NAME }}-staging\"" >> backend.hcl
+          terraform init -backend-config=backend.hcl -reconfigure
+      - name: Destroy Terraform
+        run: terraform destroy -auto-approve -var-file="env/staging.tfvars"
+
+  destroy_tech:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.9.8
+      - name: Initialize Terraform
+        run: |
+          echo "resource_group_name  = \"${{ secrets.TF_AZURE_RG }}\"" > backend.hcl
+          echo "storage_account_name = \"${{ secrets.TF_AZURE_STORAGE_ACCOUNT }}\"" >> backend.hcl
+          echo "container_name       = \"${{ secrets.TF_AZURE_CONTAINER }}\"" >> backend.hcl
+          echo "key                  = \"${{ secrets.TF_STATE_NAME }}-tech\"" >> backend.hcl
+          terraform init -backend-config=backend.hcl -reconfigure
+      - name: Destroy Terraform
+        run: terraform destroy -auto-approve -var-file="env/tech.tfvars"
