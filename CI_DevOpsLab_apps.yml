@@ -3,10 +3,10 @@ name: CI DevOpsLab_apps
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
 
 jobs:
   plan_staging:
